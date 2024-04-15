@@ -70,7 +70,7 @@ class MyCallbackClass(PW.CallbackClass):
             self.mUserDataProgress = progress100
             print('User Progress {}, Bytes written: {}'.format(self.mUserDataProgress, total_bytes_written))
 
-def klb_2_ims_final(path_to_klb, output_filename, imaris_type = 'uint8', mTitle = 'default mTitle', mColor_table = [PW.Color(1, 1, 1, 1)], block_size = None):
+def klb_2_ims(path_to_klb, output_filename, imaris_type = 'uint8', mTitle = 'default mTitle', mColor_table = [PW.Color(1, 1, 1, 1)], block_size = None):
     '''
     Converts the Keller Lab Block (KLB) file specified by path_to_klb to an Imaris file, specified by output filename. 
     
