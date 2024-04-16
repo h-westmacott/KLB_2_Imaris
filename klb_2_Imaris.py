@@ -142,8 +142,8 @@ def klb_2_ims(path_to_klb, output_filename, imaris_type = 'uint8', mTitle = 'def
                                                                    min(image_size.y-1,(y*block_size.y)+block_size.y-1),
                                                                    min(image_size.x-1,(x*block_size.x)+block_size.x-1)])
                             
-                            if (block_img.shape[0]<block_size.c) or (block_img.shape[1]<block_size.t) or (block_img.shape[2]<block_size.z) or (block_img.shape[3]<block_size.y) or (block_img.shape[4]<block_size.x):
-                                block_img_padded = np.pad(block_img, [(0, block_size.c-block_img.shape[0]), (0,block_size.t-block_img.shape[1]), (0,block_size.z-block_img.shape[2]), (0,block_size.y-block_img.shape[3]), (0,block_size.x-block_img.shape[4])],mode='constant')
+                            if (block_img.shape[0]<block_size.t) or (block_img.shape[1]<block_size.c) or (block_img.shape[2]<block_size.z) or (block_img.shape[3]<block_size.y) or (block_img.shape[4]<block_size.x):
+                                block_img_padded = np.pad(block_img, [(0, block_size.t-block_img.shape[0]), (0,block_size.c-block_img.shape[1]), (0,block_size.z-block_img.shape[2]), (0,block_size.y-block_img.shape[3]), (0,block_size.x-block_img.shape[4])],mode='constant')
                                 converter.CopyBlock(block_img_padded, block_index)
                             else:
                                 converter.CopyBlock(block_img, block_index)
@@ -156,7 +156,12 @@ def klb_2_ims(path_to_klb, output_filename, imaris_type = 'uint8', mTitle = 'def
     parameters.set_channel_name(0, 'My Channel 1')
     time_infos = [datetime.today()]
     color_infos = [PW.ColorInfo() for _ in range(image_size.c)]
-    color_infos[0].set_color_table(mColor_table)
+    # color_infos[0].set_color_table(mColor_table)
+
+    color_infos[0].set_base_color(PW.Color(1, 0, 0, 1))
+    color_infos[1].set_base_color(PW.Color(0, 1, 0, 1))
+    color_infos[2].set_base_color(PW.Color(0, 0, 1, 1))
+
 
     converter.Finish(image_extents, parameters, time_infos, color_infos, adjust_color_range)
     
