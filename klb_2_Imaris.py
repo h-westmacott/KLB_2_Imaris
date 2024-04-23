@@ -70,7 +70,7 @@ class MyCallbackClass(PW.CallbackClass):
             self.mUserDataProgress = progress100
             print('User Progress {}, Bytes written: {}'.format(self.mUserDataProgress, total_bytes_written))
 
-def klb_2_ims(path_to_klb, output_filename, imaris_type = 'uint8', mTitle = 'default mTitle', mColor_table = [PW.Color(1, 1, 1, 1)], block_size = None):
+def klb_2_ims(path_to_klb, output_filename, imaris_type = 'uint8', mTitle = 'default mTitle', block_size = None):
     '''
     Converts the Keller Lab Block (KLB) file specified by path_to_klb to an Imaris file, specified by output filename. 
     
@@ -115,7 +115,6 @@ def klb_2_ims(path_to_klb, output_filename, imaris_type = 'uint8', mTitle = 'def
     converter = PW.ImageConverter(imaris_type, image_size, sample_size, dimension_sequence, block_size,
                                   output_filename, options, application_name, application_version, callback_class)
 
-    # num_complete_blocks = image_size / block_size
     num_incomplete_blocks = getnumIncompleteBlocks(image_size,block_size)
 
     block_index = PW.ImageSize()
@@ -151,17 +150,21 @@ def klb_2_ims(path_to_klb, output_filename, imaris_type = 'uint8', mTitle = 'def
     adjust_color_range = True
     image_extents = PW.ImageExtents(0, 0, 0, image_size.x, image_size.y, image_size.z)
     parameters = PW.Parameters()
-    parameters.set_value('Image', 'ImageSizeInMB', 2400)
     parameters.set_value('Image', 'Info', mTitle)
     parameters.set_channel_name(0, 'My Channel 1')
     time_infos = [datetime.today()]
     color_infos = [PW.ColorInfo() for _ in range(image_size.c)]
-    # color_infos[0].set_color_table(mColor_table)
-
-    color_infos[0].set_base_color(PW.Color(1, 0, 0, 1))
-    color_infos[1].set_base_color(PW.Color(0, 1, 0, 1))
-    color_infos[2].set_base_color(PW.Color(0, 0, 1, 1))
-
+    if image_size.c==1:
+        color_infos[0].set_base_color(PW.Color(1, 1, 1, 1))
+    elif image_size.c==3:
+        color_infos[0].set_base_color(PW.Color(1, 0, 0, 1))
+        color_infos[1].set_base_color(PW.Color(0, 1, 0, 1))
+        color_infos[2].set_base_color(PW.Color(0, 0, 1, 1))
+    else:
+        for channel in range(image_size.c):
+            # if num channels is not equal to 1 or 3, all channels are set to white
+            # to be modified in imaris by user.
+            color_infos[channel].set_base_color(PW.Color(1, 1, 1, 1))
 
     converter.Finish(image_extents, parameters, time_infos, color_infos, adjust_color_range)
     
