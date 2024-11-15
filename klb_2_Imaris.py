@@ -2,6 +2,8 @@ import pyklb
 import numpy as np
 from datetime import datetime
 from PyImarisWriter import PyImarisWriter as PW
+from pathlib import Path
+import os
 
 def PyImarisWriterModulo(imagesizeA,imagesizeB):
     '''
@@ -101,7 +103,14 @@ def klb_2_ims(path_to_klb, output_filename, imaris_type = 'uint8', mTitle = 'def
     block_size.x = min(block_size.x, image_size.x)
     
     sample_size = PW.ImageSize(x=1, y=1, z=1, c=1, t=1)
-    output_filename = output_filename
+    if not output_filename.endswith('.ims'):
+        output_filename = output_filename+'.ims'
+    # output_filename = output_filename
+
+    
+
+    directory = os.path.dirname(output_filename)
+    Path(directory).mkdir(parents=True, exist_ok=True)
 
     options = PW.Options()
     options.mNumberOfThreads = 1
