@@ -144,7 +144,7 @@ def klb_2_ims(path_to_klb, output_filename, imaris_type = 'uint8', mTitle = 'def
                                                                    (z*block_size.z),
                                                                    (y*block_size.y),
                                                                    (x*block_size.x)],
-                                                      tczyx_max = [min(image_size.t-1,(c*block_size.t)+block_size.t-1),
+                                                      tczyx_max = [min(image_size.t-1,(t*block_size.t)+block_size.t-1),
                                                                    min(image_size.c-1,(c*block_size.c)+block_size.c-1),
                                                                    min(image_size.z-1,(z*block_size.z)+block_size.z-1),
                                                                    min(image_size.y-1,(y*block_size.y)+block_size.y-1),
