@@ -179,3 +179,144 @@ def klb_2_ims(path_to_klb, output_filename, imaris_type = 'uint8', mTitle = 'def
     
     converter.Destroy()
     print('Wrote {} to {}'.format(mTitle, output_filename))
+
+
+def mcdole_klb_to_ims(config):
+    '''
+    convert a sequence of Keller Lab Block (KLB) files to a single Imaris file, following the
+    typical file structure used in the McDole lab. Assumes that each timepoint is stored
+    in its own folder, with file names containing 'TM000000' for timepoint and 'CHN00' for channel.
+    '''
+     ############
+    import pyklb
+    import numpy as np
+    from datetime import datetime
+    from PyImarisWriter import PyImarisWriter as PW
+    from pathlib import Path
+    import os
+
+    path_to_klb=config["path_to_T0_klb"]
+
+    output_filename = config["output_filename"]
+
+    num_channels = config["num_channels"]
+
+    head = pyklb.readheader(path_to_klb)
+        
+    shape = head['imagesize_tczyx']
+
+    imaris_type = str(head['datatype'])
+
+    if config["block_size"] is None:
+        block_size = PW.ImageSize(t=shape[0],
+                                  c=shape[1],
+                                  z=shape[2],
+                                  y=shape[3],
+                                  x=shape[4])
+    else:
+        # block_size = config["block_size"]
+        block_size_list = [x[1] if x[1] is not None else x[0] for x in zip(shape,config["block_size"])]
+        block_size = PW.ImageSize(t=min(block_size_list[0], shape[0]),
+                                  c=min(block_size_list[1], shape[1]),
+                                  z=min(block_size_list[2], shape[2]),
+                                  y=min(block_size_list[3], shape[3]),
+                                  x=min(block_size_list[4], shape[4]))
+    print('Using block size: t={}, c={}, z={}, y={}, x={}'.format(block_size.t,block_size.c,block_size.z,block_size.y,block_size.x))
+
+    directory = os.fsencode(config["path_to_all_frames"])
+    folder_list = os.listdir(directory)
+
+
+    image_size = PW.ImageSize(t=len(os.listdir(directory)),
+                                c=num_channels,
+                                z=shape[2],
+                                y=shape[3],
+                                x=shape[4])
+        
+    dimension_sequence = PW.DimensionSequence('x', 'y', 'z', 'c', 't')
+
+
+    sample_size = PW.ImageSize(x=1, y=1, z=1, c=1, t=1)
+    if not output_filename.endswith('.ims'):
+            output_filename = output_filename+'.ims'
+    out_directory = os.path.dirname(output_filename)
+    Path(out_directory).mkdir(parents=True, exist_ok=True)
+
+    options = PW.Options()
+    options.mNumberOfThreads = 1
+    options.mCompressionAlgorithmType = PW.eCompressionAlgorithmGzipLevel2
+    options.mEnableLogProgress = True
+
+    application_name = 'PyImarisWriter'
+    application_version = '1.0.0'
+
+    callback_class = MyCallbackClass()
+    converter = PW.ImageConverter(imaris_type, image_size, sample_size, dimension_sequence, block_size,
+                                    output_filename, options, application_name, application_version, callback_class)
+
+    num_incomplete_blocks = getnumIncompleteBlocks(image_size,block_size)
+
+    from tqdm import tqdm
+
+    generic_file_name = path_to_klb.split('\\')[-1]
+
+    block_index = PW.ImageSize()
+    for t in tqdm(range(len(os.listdir(directory)))):
+        block_index.t = t
+        for c in range(num_channels):
+            
+            this_file_name = generic_file_name.replace('CHN00','CHN'+str(c).zfill(2))
+            this_file_name = this_file_name.replace('TM000000','TM'+str(t).zfill(6))
+            
+            path_to_klb = os.path.join(directory.decode('UTF-8'), folder_list[t].decode('UTF-8'),this_file_name)
+            block_index.c = c
+            for z in range(num_incomplete_blocks.z):
+                block_index.z = z
+                for y in range(num_incomplete_blocks.y):
+                    block_index.y = y
+                    for x in range(num_incomplete_blocks.x):
+                        block_index.x = x
+                        if converter.NeedCopyBlock(block_index):
+                            block_img = pyklb.readroi(path_to_klb, 
+                                                        tczyx_min = [0,
+                                                                    0,
+                                                                    (z*block_size.z),
+                                                                    (y*block_size.y),
+                                                                    (x*block_size.x)],
+                                                        tczyx_max = [0,
+                                                                    0,
+                                                                    min(image_size.z-1,(z*block_size.z)+block_size.z-1),
+                                                                    min(image_size.y-1,(y*block_size.y)+block_size.y-1),
+                                                                    min(image_size.x-1,(x*block_size.x)+block_size.x-1)])
+                            
+                            if (block_img.shape[0]<block_size.t) or (block_img.shape[1]<block_size.c) or (block_img.shape[2]<block_size.z) or (block_img.shape[3]<block_size.y) or (block_img.shape[4]<block_size.x):
+                                block_img_padded = np.pad(block_img, [(0, block_size.t-block_img.shape[0]), (0,block_size.c-block_img.shape[1]), (0,block_size.z-block_img.shape[2]), (0,block_size.y-block_img.shape[3]), (0,block_size.x-block_img.shape[4])],mode='constant')
+                                converter.CopyBlock(block_img_padded, block_index)
+                            else:
+                                converter.CopyBlock(block_img, block_index)
+
+
+    adjust_color_range = True
+    image_extents = PW.ImageExtents(0, 0, 0, image_size.x, image_size.y, image_size.z)
+    parameters = PW.Parameters()
+    mTitle = 'default mTitle'
+    parameters.set_value('Image', 'Info', mTitle)
+    parameters.set_channel_name(0, 'My Channel 1')
+    time_infos = [datetime.today()]
+    color_infos = [PW.ColorInfo() for _ in range(image_size.c)]
+    if image_size.c==1:
+        color_infos[0].set_base_color(PW.Color(1, 1, 1, 1))
+    elif image_size.c==3:
+        color_infos[0].set_base_color(PW.Color(1, 0, 0, 1))
+        color_infos[1].set_base_color(PW.Color(0, 1, 0, 1))
+        color_infos[2].set_base_color(PW.Color(0, 0, 1, 1))
+    else:
+        for channel in range(image_size.c):
+            # if num channels is not equal to 1 or 3, all channels are set to white
+            # to be modified in imaris by user.
+            color_infos[channel].set_base_color(PW.Color(1, 1, 1, 1))
+
+    converter.Finish(image_extents, parameters, time_infos, color_infos, adjust_color_range)
+
+    converter.Destroy()
+    print('Wrote {} to {}'.format(mTitle, output_filename))
